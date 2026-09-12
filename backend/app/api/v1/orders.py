@@ -59,12 +59,23 @@ def run_batch_agents(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Triggers autonomous agents on all pending/in_confirmation orders in the selected lookback window."""
-    since = datetime.now(timezone.utc) - timedelta(hours=req.hours)
-    orders = db.query(Order).filter(
-        Order.user_id == current_user.id,
-        Order.order_timestamp >= since
-    ).all()
+    """
+    Triggers autonomous agents either on:
+    1. Specifically selected orders (if req.order_ids provided)
+    2. All orders in the selected lookback window (if req.hours provided)
+    """
+    if req.order_ids and len(req.order_ids) > 0:
+        orders = db.query(Order).filter(
+            Order.user_id == current_user.id,
+            Order.id.in_(req.order_ids)
+        ).all()
+    else:
+        hours = req.hours or 24
+        since = datetime.now(timezone.utc) - timedelta(hours=hours)
+        orders = db.query(Order).filter(
+            Order.user_id == current_user.id,
+            Order.order_timestamp >= since
+        ).all()
     
     direct_approved = 0
     in_confirmation = 0
@@ -88,6 +99,19 @@ def run_batch_agents(
         high_risk_flagged=high_risk_flagged,
         orders_affected=affected_ids
     )
+
+@router.post("/{order_id}/run")
+def run_agent_single_order(
+    order_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Runs agent pipeline on a single specific order."""
+    order = db.query(Order).filter(Order.id == order_id, Order.user_id == current_user.id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    res = agent_orchestrator.run_pipeline_for_order(order, db)
+    return res
 
 @router.post("/{order_id}/simulate-reply")
 def simulate_customer_reply(

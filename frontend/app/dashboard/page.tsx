@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Play, RefreshCw, Layers, ShieldCheck, CheckCircle, 
-  AlertCircle, Smartphone, Database, LogOut, Sparkles, Filter 
+  AlertCircle, Smartphone, Database, LogOut, Sparkles, Filter, CheckSquare, Square
 } from 'lucide-react';
 import { fetchWithAuth } from '@/lib/api';
 import MetricCards from '@/components/MetricCards';
@@ -19,6 +19,9 @@ export default function DashboardPage() {
   const [hoursFilter, setHoursFilter] = useState<number>(24);
   const [runningBatch, setRunningBatch] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  
+  // Selective order selection state
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
 
   const loadDashboardData = async () => {
     try {
@@ -44,7 +47,6 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    // Check auth
     const token = localStorage.getItem('deliveriq_token');
     if (!token) {
       router.push('/login');
@@ -53,14 +55,38 @@ export default function DashboardPage() {
     loadDashboardData();
   }, [hoursFilter]);
 
-  const handleRunBatchAgents = async () => {
+  // Toggle single order selection
+  const toggleSelectOrder = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setSelectedOrderIds((prev) => 
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  // Toggle select all
+  const toggleSelectAll = () => {
+    if (selectedOrderIds.length === orders.length) {
+      setSelectedOrderIds([]);
+    } else {
+      setSelectedOrderIds(orders.map((o) => o.id));
+    }
+  };
+
+  // Run agents on selective or batch window
+  const handleRunBatchAgents = async (specificIds?: string[]) => {
     try {
       setRunningBatch(true);
+      const targetIds = specificIds || (selectedOrderIds.length > 0 ? selectedOrderIds : undefined);
+      
       const res = await fetchWithAuth('/orders/batch-run', {
         method: 'POST',
-        body: JSON.stringify({ hours: hoursFilter })
+        body: JSON.stringify({ 
+          hours: hoursFilter,
+          order_ids: targetIds
+        })
       });
       if (res.ok) {
+        setSelectedOrderIds([]);
         await loadDashboardData();
       }
     } catch (err) {
@@ -77,7 +103,6 @@ export default function DashboardPage() {
       });
       if (res.ok) {
         await loadDashboardData();
-        // Update selected order in modal
         const updated = await (await fetchWithAuth(`/orders/?hours=${hoursFilter}&limit=100`)).json();
         const found = updated.find((o: any) => o.id === orderId);
         if (found) setSelectedOrder(found);
@@ -111,7 +136,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Navigation Links & Global Actions */}
           <div className="flex items-center gap-4">
             <button
               onClick={() => router.push('/integrations')}
@@ -155,7 +179,7 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          {/* Batch Agent Runner CTA */}
+          {/* Selective or Batch Action Button */}
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <button
               onClick={loadDashboardData}
@@ -166,12 +190,21 @@ export default function DashboardPage() {
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
             <button
-              onClick={handleRunBatchAgents}
-              disabled={runningBatch}
-              className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-emerald-600 hover:opacity-95 text-white font-bold text-xs shadow-lg shadow-indigo-600/25 transition-all disabled:opacity-50"
+              onClick={() => handleRunBatchAgents()}
+              disabled={runningBatch || orders.length === 0}
+              className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs shadow-lg transition-all disabled:opacity-50 text-white ${
+                selectedOrderIds.length > 0 
+                  ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/25'
+                  : 'bg-gradient-to-r from-indigo-600 via-purple-600 to-emerald-600 hover:opacity-95 shadow-indigo-600/25'
+              }`}
             >
               <Sparkles className={`w-4 h-4 ${runningBatch ? 'animate-spin' : ''}`} />
-              {runningBatch ? `Agents Running on ${hoursFilter}h Orders...` : `⚡ Run AI Agents on Last ${hoursFilter}h Orders`}
+              {runningBatch
+                ? 'Agents Executing Verification...'
+                : selectedOrderIds.length > 0
+                ? `⚡ Run AI Agents on ${selectedOrderIds.length} Selected Order${selectedOrderIds.length > 1 ? 's' : ''}`
+                : `⚡ Run AI Agents on Last ${hoursFilter}h Orders (${orders.length})`
+              }
             </button>
           </div>
         </div>
@@ -179,21 +212,43 @@ export default function DashboardPage() {
         {/* Executive KPI Cards */}
         <MetricCards data={metrics} loading={loading} />
 
-        {/* Core Layout: Map + Live Orders Queue */}
+        {/* Core Layout: Map + Live Orders Queue with Multi-Select */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left Column: Interactive Map (7 cols) */}
           <div className="lg:col-span-7 space-y-3">
             <RiskMap orders={orders} onSelectOrder={(o) => setSelectedOrder(o)} />
           </div>
 
-          {/* Right Column: Handled Cases / Order Queue (5 cols) */}
-          <div className="lg:col-span-5 glass-panel p-5 rounded-2xl flex flex-col h-[480px]">
+          {/* Right Column: Selectable Orders Queue (5 cols) */}
+          <div className="lg:col-span-5 glass-panel p-5 rounded-2xl flex flex-col h-[520px]">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                <Layers className="w-4 h-4 text-indigo-400" />
-                Live Handled Cases Queue
-              </h3>
-              <span className="text-xs text-slate-400 font-mono">{orders.length} orders</span>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={toggleSelectAll}
+                  className="text-slate-400 hover:text-white"
+                  title={selectedOrderIds.length === orders.length ? 'Deselect All' : 'Select All'}
+                >
+                  {selectedOrderIds.length > 0 && selectedOrderIds.length === orders.length ? (
+                    <CheckSquare className="w-4 h-4 text-indigo-400" />
+                  ) : (
+                    <Square className="w-4 h-4 text-slate-500" />
+                  )}
+                </button>
+                <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-indigo-400" />
+                  Orders ({selectedOrderIds.length > 0 ? `${selectedOrderIds.length} selected` : `${orders.length} total`})
+                </h3>
+              </div>
+              <span className="text-xs text-slate-400 font-mono">
+                {selectedOrderIds.length > 0 ? (
+                  <button 
+                    onClick={() => setSelectedOrderIds([])}
+                    className="text-xs text-indigo-400 hover:underline"
+                  >
+                    Clear selection
+                  </button>
+                ) : 'Select to run agent'}
+              </span>
             </div>
 
             {/* Orders Feed */}
@@ -204,36 +259,56 @@ export default function DashboardPage() {
                   <p className="text-xs">No orders found in the last {hoursFilter} hours.</p>
                 </div>
               ) : (
-                orders.map((o) => (
-                  <div
-                    key={o.id}
-                    onClick={() => setSelectedOrder(o)}
-                    className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-indigo-500/50 cursor-pointer transition-all flex items-center justify-between"
-                  >
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-white">{o.external_order_id}</span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
-                          o.status === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-400' :
-                          o.status === 'CANCELLED' ? 'bg-rose-500/20 text-rose-400' :
-                          'bg-amber-500/20 text-amber-400'
-                        }`}>
-                          {o.status}
-                        </span>
+                orders.map((o) => {
+                  const isSelected = selectedOrderIds.includes(o.id);
+                  return (
+                    <div
+                      key={o.id}
+                      onClick={() => setSelectedOrder(o)}
+                      className={`p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
+                        isSelected 
+                          ? 'bg-indigo-950/40 border-indigo-500/70 shadow-sm shadow-indigo-500/10' 
+                          : 'bg-slate-950/60 border-slate-800/80 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <button 
+                          onClick={(e) => toggleSelectOrder(e, o.id)} 
+                          className="text-slate-400 hover:text-white"
+                        >
+                          {isSelected ? (
+                            <CheckSquare className="w-4 h-4 text-indigo-400" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-600 hover:text-slate-400" />
+                          )}
+                        </button>
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-bold text-white">{o.external_order_id}</span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                              o.status === 'APPROVED' ? 'bg-emerald-500/20 text-emerald-400' :
+                              o.status === 'CANCELLED' ? 'bg-rose-500/20 text-rose-400' :
+                              'bg-amber-500/20 text-amber-400'
+                            }`}>
+                              {o.status}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-400 truncate max-w-[190px]">{o.customer_name} • {o.city}</p>
+                        </div>
                       </div>
-                      <p className="text-xs text-slate-400 truncate max-w-[200px]">{o.customer_name} • {o.city}</p>
+
+                      <div className="text-right">
+                        <span className={`text-sm font-extrabold font-mono ${
+                          o.risk_score >= 80 ? 'text-emerald-400' :
+                          o.risk_score < 50 ? 'text-rose-400' : 'text-amber-400'
+                        }`}>
+                          {o.risk_score} pts
+                        </span>
+                        <p className="text-[10px] text-slate-400">PKR {o.cod_amount?.toLocaleString()}</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className={`text-sm font-extrabold font-mono ${
-                        o.risk_score >= 80 ? 'text-emerald-400' :
-                        o.risk_score < 50 ? 'text-rose-400' : 'text-amber-400'
-                      }`}>
-                        {o.risk_score} pts
-                      </span>
-                      <p className="text-[10px] text-slate-400">PKR {o.cod_amount?.toLocaleString()}</p>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>

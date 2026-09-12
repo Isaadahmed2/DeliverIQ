@@ -74,7 +74,8 @@ class OrderResponse(BaseModel):
 
 # --- AGENT RUN SCHEMAS ---
 class BatchAgentRunRequest(BaseModel):
-    hours: int = Field(default=24, description="Lookback window: 6, 12, 18, or 24 hours")
+    hours: Optional[int] = Field(default=24, description="Lookback window: 6, 12, 18, or 24 hours")
+    order_ids: Optional[List[str]] = Field(default=None, description="Optional list of specific order IDs to run agents on selectively")
 
 class BatchAgentRunResponse(BaseModel):
     processed_count: int
