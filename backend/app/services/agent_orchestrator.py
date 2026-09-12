@@ -101,14 +101,26 @@ class AgentOrchestrator:
             suggested_landmarks=suggested_landmarks
         )
         
+        is_whitelisted = wa_resp.get("whitelisted", False)
+        if wa_resp.get("status") == "blocked_by_guardrail":
+            thought_msg = f"Phone {order.customer_phone} is not in user test whitelist (03455113612, 03410015303). Outbound message simulated safely to avoid spamming random numbers."
+            action_msg = "Simulated WhatsApp confirmation (Safety Guardrail active: Non-whitelisted number)."
+        else:
+            thought_msg = f"Dispatched live interactive verification template to whitelisted number {order.customer_phone}."
+            action_msg = "Dispatched real WhatsApp confirmation via Evolution API."
+
         exec_wa = AgentExecution(
             order_id=order.id,
             agent_name="WHATSAPP_NEGOTIATOR",
             attempt_number=order.retry_count,
             status="WAITING_INPUT",
-            thought=f"Sent interactive verification prompt to {order.customer_phone}. Waiting for customer response.",
-            action_taken="Dispatched WhatsApp verification template via Evolution API.",
-            observation={"evolution_api_response": wa_resp, "landmarks_included": len(suggested_landmarks) > 0}
+            thought=thought_msg,
+            action_taken=action_msg,
+            observation={
+                "evolution_api_response": wa_resp, 
+                "landmarks_included": len(suggested_landmarks) > 0,
+                "whitelisted": is_whitelisted
+            }
         )
         db.add(exec_wa)
         db.commit()

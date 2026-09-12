@@ -96,6 +96,25 @@ class EvolutionAPIClient:
         except Exception as e:
             return {"error": f"Evolution API connection failed: {str(e)}"}
 
+    # User Safety Guardrail: ONLY these numbers may receive real outbound WhatsApp messages
+    WHITELISTED_PHONES = {"923455113612", "923410015303"}
+
+    @classmethod
+    def normalize_phone(cls, phone: str) -> str:
+        """Normalizes Pakistani phone numbers to 923XXXXXXXXX format."""
+        digits = "".join(filter(str.isdigit, phone or ""))
+        if digits.startswith("03"):
+            return "92" + digits[1:]
+        elif digits.startswith("3") and len(digits) == 10:
+            return "92" + digits
+        return digits
+
+    @classmethod
+    def is_whitelisted(cls, phone: str) -> bool:
+        """Verifies if phone number matches explicitly authorized test numbers."""
+        normalized = cls.normalize_phone(phone)
+        return normalized in cls.WHITELISTED_PHONES
+
     def send_confirmation_message(
         self, 
         instance_name: Optional[str], 
@@ -105,14 +124,27 @@ class EvolutionAPIClient:
         cod_amount: float,
         suggested_landmarks: Optional[list] = None
     ) -> Dict[str, Any]:
-        """Sends WhatsApp confirmation message using connected or specified instance."""
+        """
+        Sends WhatsApp confirmation message using connected or specified instance.
+        STRICT SAFETY ENFORCEMENT: Never sends real messages to random numbers.
+        Only messages explicitly whitelisted numbers: 03455113612 & 03410015303.
+        """
+        cleaned_phone = self.normalize_phone(phone)
+
+        # Enforce Whitelist Guardrail
+        if not self.is_whitelisted(phone):
+            return {
+                "status": "blocked_by_guardrail",
+                "phone": phone,
+                "normalized": cleaned_phone,
+                "whitelisted": False,
+                "message": f"Real WhatsApp dispatch skipped for safety: {phone} is not in the whitelist (03455113612, 03410015303). Outgoing message simulated successfully.",
+                "simulated": True
+            }
+
         active_instance = instance_name
         if not active_instance or active_instance == "auto" or active_instance == "deliveriq_main":
             active_instance = self.get_first_connected_instance() or "deliveriq_main"
-
-        cleaned_phone = phone.replace("+", "").replace("-", "").strip()
-        if cleaned_phone.startswith("0"):
-            cleaned_phone = "92" + cleaned_phone[1:]
             
         url = f"{self.base_url}/message/sendText/{active_instance}"
         
@@ -141,8 +173,14 @@ class EvolutionAPIClient:
         
         try:
             resp = requests.post(url, json=payload, headers=self.headers, timeout=8)
-            return {"status_code": resp.status_code, "instance": active_instance, "response": resp.json() if resp.status_code == 200 else resp.text}
+            return {
+                "status_code": resp.status_code, 
+                "instance": active_instance, 
+                "whitelisted": True,
+                "phone": cleaned_phone,
+                "response": resp.json() if resp.status_code == 200 else resp.text
+            }
         except Exception as e:
-            return {"status": "error", "message": str(e)}
+            return {"status": "error", "whitelisted": True, "message": str(e)}
 
 evolution_client = EvolutionAPIClient()
