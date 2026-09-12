@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from typing import Optional
 from backend.app.db.session import get_db
 from backend.app.models.models import Integration, User
 from backend.app.schemas.schemas import IntegrationUpdate
@@ -8,9 +9,14 @@ from backend.app.services.evolution_client import evolution_client
 
 router = APIRouter()
 
+@router.get("/whatsapp/instances")
+def get_all_whatsapp_instances(current_user: User = Depends(get_current_user)):
+    """Lists all WhatsApp instances from Evolution API."""
+    return evolution_client.list_instances()
+
 @router.get("/whatsapp/status")
 def get_whatsapp_status(
-    instance_name: str = Query("deliveriq_main"),
+    instance_name: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user)
 ):
     """Fetches real-time connection status from local Evolution API on port 8080."""

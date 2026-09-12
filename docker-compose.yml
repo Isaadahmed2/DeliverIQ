@@ -1,5 +1,12 @@
 version: '3.8'
 
+networks:
+  default:
+    name: ai_thinkerers_default
+  expensia_net:
+    external: true
+    name: expensia_default
+
 services:
   deliveriq-backend:
     build:
@@ -10,12 +17,13 @@ services:
       - "8000:8000"
     environment:
       - PORT=8000
-      - EVOLUTION_API_URL=http://host.docker.internal:8080
-      - EVOLUTION_API_KEY=global_api_key
+      - EVOLUTION_API_URL=http://expensia-evolution-api-1:8080
+      - EVOLUTION_API_KEY=429683C4C977415CAAFCCE10F7D57E11
       - SECRET_KEY=deliveriq_super_secret_jwt_key_pakistan_2026
       - DATABASE_URL=sqlite:///./deliveriq.db
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - expensia_net
     restart: unless-stopped
 
   deliveriq-frontend:
@@ -29,4 +37,6 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
     depends_on:
       - deliveriq-backend
+    networks:
+      - default
     restart: unless-stopped
