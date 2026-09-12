@@ -1,0 +1,5 @@
+External_Order_ID,Customer_Name,Customer_Phone,Shipping_Address,City,COD_Amount
+ORD-PK-9001,Saad Ahmed,+923410015303,House #14 Street 5 near Jamia Masjid Gulberg 3,Lahore,3500
+ORD-PK-9002,Saad Enterprise,+923455113612,Flat 304 Block 13-D near Meezan Bank Gulshan-e-Iqbal,Karachi,4800
+ORD-PK-9003,Saad Test Remote,+923410015303,main bazar near river bridge,Turbat,18500
+ORD-PK-9004,Saad VIP Order,+923455113612,House 22 Street 10 Sector F-7/2,Islamabad,2900

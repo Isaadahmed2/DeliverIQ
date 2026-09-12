@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, MessageSquare, Sheet, CheckCircle2, RefreshCw, QrCode } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Sheet, CheckCircle2, RefreshCw, QrCode, Download, Sparkles, Copy } from 'lucide-react';
 import { fetchWithAuth } from '@/lib/api';
 
 export default function IntegrationsPage() {
@@ -12,9 +12,11 @@ export default function IntegrationsPage() {
   const [selectedInstance, setSelectedInstance] = useState<string>('auto');
   const [waQr, setWaQr] = useState<string | null>(null);
   const [sheetUrl, setSheetUrl] = useState('');
+  const [syncingSheet, setSyncingSheet] = useState(false);
   const [hubspotToken, setHubspotToken] = useState('');
   const [loadingWa, setLoadingWa] = useState(false);
   const [savedMessage, setSavedMessage] = useState('');
+  const [syncedOrdersInfo, setSyncedOrdersInfo] = useState<any>(null);
 
   const checkWhatsApp = async () => {
     try {
@@ -67,19 +69,39 @@ export default function IntegrationsPage() {
     checkWhatsApp();
   }, [selectedInstance]);
 
-  const handleSaveIntegration = async (provider: string, config: any) => {
+  const handleSyncGoogleSheet = async () => {
+    if (!sheetUrl) return;
     try {
-      const res = await fetchWithAuth('/integrations/', {
+      setSyncingSheet(true);
+      setSyncedOrdersInfo(null);
+      const res = await fetchWithAuth('/integrations/google-sheets/sync', {
         method: 'POST',
-        body: JSON.stringify({ provider, config, is_active: true })
+        body: JSON.stringify({ sheet_url: sheetUrl })
       });
+      const data = await res.json();
       if (res.ok) {
-        setSavedMessage(`Saved ${provider} configuration successfully!`);
-        setTimeout(() => setSavedMessage(''), 3000);
+        setSyncedOrdersInfo(data);
+        setSavedMessage(`Successfully synced ${data.synced_count} orders from Google Sheet!`);
+        setTimeout(() => setSavedMessage(''), 4000);
+      } else {
+        alert(data.detail || 'Failed to sync sheet. Ensure link sharing is set to Anyone with link can view.');
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setSyncingSheet(false);
     }
+  };
+
+  const copyTemplateCsv = () => {
+    const csvContent = `External_Order_ID,Customer_Name,Customer_Phone,Shipping_Address,City,COD_Amount
+ORD-PK-9001,Saad Ahmed,+923410015303,House #14 Street 5 near Jamia Masjid Gulberg 3,Lahore,3500
+ORD-PK-9002,Saad Enterprise,+923455113612,Flat 304 Block 13-D near Meezan Bank Gulshan-e-Iqbal,Karachi,4800
+ORD-PK-9003,Saad Test Remote,+923410015303,main bazar near river bridge,Turbat,18500
+ORD-PK-9004,Saad VIP Order,+923455113612,House 22 Street 10 Sector F-7/2,Islamabad,2900`;
+    navigator.clipboard.writeText(csvContent);
+    setSavedMessage('Sample table copied to clipboard! Paste into Google Sheets.');
+    setTimeout(() => setSavedMessage(''), 3000);
   };
 
   return (
@@ -136,7 +158,6 @@ export default function IntegrationsPage() {
           </div>
 
           <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
-            {/* Instance Selector */}
             {waInstances.length > 0 && (
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
@@ -203,65 +224,61 @@ export default function IntegrationsPage() {
 
         {/* 2. Google Sheets Integration */}
         <div className="glass-panel p-6 rounded-2xl space-y-4">
-          <div className="flex items-center gap-3">
-            <span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400">
-              <Sheet className="w-6 h-6" />
-            </span>
-            <div>
-              <h3 className="font-bold text-sm text-white">Google Sheets Two-Way Sync</h3>
-              <p className="text-xs text-slate-400">Pulls incoming orders and automatically writes back DeliverIQ safety scores & status</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400">
+                <Sheet className="w-6 h-6" />
+              </span>
+              <div>
+                <h3 className="font-bold text-sm text-white">Google Sheets Two-Way Order Ingestion</h3>
+                <p className="text-xs text-slate-400">Syncs your customer orders and triggers multi-agent AI verification</p>
+              </div>
             </div>
+            <button
+              onClick={copyTemplateCsv}
+              className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300 text-xs font-semibold flex items-center gap-1.5"
+            >
+              <Copy className="w-3.5 h-3.5 text-indigo-400" /> Copy Sample Table
+            </button>
           </div>
 
           <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Google Spreadsheet ID or URL</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">
+                Google Spreadsheet Shareable URL (Set link access to: &quot;Anyone with link can view&quot;)
+              </label>
               <input
                 type="text"
-                placeholder="https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit"
+                placeholder="https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit?usp=sharing"
                 value={sheetUrl}
                 onChange={(e) => setSheetUrl(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
               />
             </div>
-            <button
-              onClick={() => handleSaveIntegration('google_sheets', { sheet_url: sheetUrl })}
-              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold"
-            >
-              Save Google Sheet Sync
-            </button>
-          </div>
-        </div>
 
-        {/* 3. HubSpot CRM */}
-        <div className="glass-panel p-6 rounded-2xl space-y-4">
-          <div className="flex items-center gap-3">
-            <span className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400">
-              ⚡
-            </span>
-            <div>
-              <h3 className="font-bold text-sm text-white">HubSpot Free CRM Integration</h3>
-              <p className="text-xs text-slate-400">Updates HubSpot Deal stages (Pending $\rightarrow$ Verified / Escalated) automatically</p>
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                onClick={handleSyncGoogleSheet}
+                disabled={syncingSheet || !sheetUrl}
+                className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-2 disabled:opacity-50"
+              >
+                <Sparkles className={`w-4 h-4 ${syncingSheet ? 'animate-spin' : ''}`} />
+                {syncingSheet ? 'Ingesting & Scoring Orders...' : '⚡ Ingest & Run Agents on Google Sheet'}
+              </button>
             </div>
-          </div>
 
-          <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">HubSpot Private App Access Token</label>
-              <input
-                type="password"
-                placeholder="pat-na1-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                value={hubspotToken}
-                onChange={(e) => setHubspotToken(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-              />
-            </div>
-            <button
-              onClick={() => handleSaveIntegration('hubspot', { token: hubspotToken })}
-              className="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold"
-            >
-              Save HubSpot Connection
-            </button>
+            {syncedOrdersInfo && (
+              <div className="mt-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300">
+                <p className="font-bold mb-1">✅ Ingested {syncedOrdersInfo.synced_count} Orders:</p>
+                <ul className="list-disc pl-4 space-y-0.5 text-slate-300">
+                  {syncedOrdersInfo.orders?.map((o: any, idx: number) => (
+                    <li key={idx}>
+                      <strong>{o.order_id}</strong> — {o.customer} ({o.phone}) | Score: <strong>{o.score} pts</strong> ({o.status})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </div>
       </main>
