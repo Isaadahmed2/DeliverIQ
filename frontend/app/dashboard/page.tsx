@@ -7,9 +7,19 @@ import {
   AlertCircle, Smartphone, Database, LogOut, Sparkles, Filter, CheckSquare, Square
 } from 'lucide-react';
 import { fetchWithAuth } from '@/lib/api';
+import dynamic from 'next/dynamic';
 import MetricCards from '@/components/MetricCards';
-import RiskMap from '@/components/RiskMap';
 import CaseAuditModal from '@/components/CaseAuditModal';
+
+const RiskMap = dynamic(() => import('@/components/RiskMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-[520px] rounded-2xl glass-panel border border-slate-800 flex flex-col items-center justify-center gap-3 bg-slate-900">
+      <div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin"></div>
+      <p className="text-xs text-slate-400">Loading OpenStreetMap Pakistan Heatmap...</p>
+    </div>
+  ),
+});
 
 export default function DashboardPage() {
   const router = useRouter();

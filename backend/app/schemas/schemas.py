@@ -40,12 +40,12 @@ class OrderCreate(BaseModel):
 class AgentExecutionSchema(BaseModel):
     id: str
     agent_name: str
-    attempt_number: int
+    attempt_number: int = 1
     status: str
     thought: Optional[str] = None
     action_taken: Optional[str] = None
-    observation: Dict[str, Any] = {}
-    score_delta: float = 0.0
+    observation: Optional[Dict[str, Any]] = None
+    score_delta: Optional[float] = 0.0
     created_at: datetime
     class Config:
         from_attributes = True
@@ -59,16 +59,16 @@ class OrderResponse(BaseModel):
     city: str
     cod_amount: float
     order_timestamp: datetime
-    risk_score: float
-    risk_tier: str
-    rto_probability: float
-    risk_factors: List[str]
-    status: str
-    retry_count: int
+    risk_score: Optional[float] = 50.0
+    risk_tier: Optional[str] = "MEDIUM"
+    rto_probability: Optional[float] = 0.5
+    risk_factors: Optional[List[str]] = []
+    status: Optional[str] = "IN_CONFIRMATION"
+    retry_count: Optional[int] = 0
     latitude: Optional[float] = None
     longitude: Optional[float] = None
-    nearby_landmarks: List[Dict[str, Any]] = []
-    agent_executions: List[AgentExecutionSchema] = []
+    nearby_landmarks: Optional[List[Dict[str, Any]]] = []
+    agent_executions: Optional[List[AgentExecutionSchema]] = []
     class Config:
         from_attributes = True
 

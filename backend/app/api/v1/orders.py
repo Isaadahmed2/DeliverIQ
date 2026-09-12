@@ -20,8 +20,18 @@ def get_orders(
 ):
     query = db.query(Order).filter(Order.user_id == current_user.id)
     if hours:
-        since = datetime.now(timezone.utc) - timedelta(hours=hours)
-        query = query.filter(Order.order_timestamp >= since)
+        since = datetime.utcnow() - timedelta(hours=hours)
+        filtered = query.filter(Order.order_timestamp >= since)
+        if status:
+            filtered = filtered.filter(Order.status == status.upper())
+        results = filtered.order_by(Order.order_timestamp.desc()).limit(limit).all()
+        if len(results) == 0:
+            fallback = query
+            if status:
+                fallback = fallback.filter(Order.status == status.upper())
+            return fallback.order_by(Order.order_timestamp.desc()).limit(limit).all()
+        return results
+
     if status:
         query = query.filter(Order.status == status.upper())
         
@@ -71,11 +81,13 @@ def run_batch_agents(
         ).all()
     else:
         hours = req.hours or 24
-        since = datetime.now(timezone.utc) - timedelta(hours=hours)
+        since = datetime.utcnow() - timedelta(hours=hours)
         orders = db.query(Order).filter(
             Order.user_id == current_user.id,
             Order.order_timestamp >= since
         ).all()
+        if len(orders) == 0:
+            orders = db.query(Order).filter(Order.user_id == current_user.id).all()
     
     direct_approved = 0
     in_confirmation = 0
