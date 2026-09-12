@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  deliveriq-backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: deliveriq-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - EVOLUTION_API_URL=http://host.docker.internal:8080
+      - EVOLUTION_API_KEY=global_api_key
+      - SECRET_KEY=deliveriq_super_secret_jwt_key_pakistan_2026
+      - DATABASE_URL=sqlite:///./deliveriq.db
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  deliveriq-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: deliveriq-frontend
+    ports:
+      - "3005:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+    depends_on:
+      - deliveriq-backend
+    restart: unless-stopped
