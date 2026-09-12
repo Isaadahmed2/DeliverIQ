@@ -31,6 +31,14 @@ def get_whatsapp_qr(
     """Retrieves QR code to pair WhatsApp on the frontend."""
     return evolution_client.get_qr_code(instance_name)
 
+@router.post("/whatsapp/disconnect")
+def disconnect_whatsapp(
+    instance_name: str = Query("deliveriq_main"),
+    current_user: User = Depends(get_current_user)
+):
+    """Disconnects and logs out from WhatsApp instance for fresh pairing."""
+    return evolution_client.logout_instance(instance_name)
+
 @router.post("/google-sheets/sync")
 def sync_google_sheet(
     payload: Dict[str, Any] = Body(...),

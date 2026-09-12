@@ -65,6 +65,21 @@ export default function IntegrationsPage() {
     }
   };
 
+  const handleDisconnect = async () => {
+    if (!confirm('Are you sure you want to disconnect and create a fresh WhatsApp connection?')) return;
+    try {
+      setLoadingWa(true);
+      await fetchWithAuth('/integrations/whatsapp/disconnect', { method: 'POST' });
+      setWaStatus({ connected: false });
+      setWaQr(null);
+      await fetchQr();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingWa(false);
+    }
+  };
+
   useEffect(() => {
     checkWhatsApp();
   }, [selectedInstance]);
@@ -98,35 +113,41 @@ export default function IntegrationsPage() {
 ORD-PK-9001,Saad Ahmed,+923410015303,House #14 Street 5 near Jamia Masjid Gulberg 3,Lahore,3500
 ORD-PK-9002,Saad Enterprise,+923455113612,Flat 304 Block 13-D near Meezan Bank Gulshan-e-Iqbal,Karachi,4800
 ORD-PK-9003,Saad Test Remote,+923410015303,main bazar near river bridge,Turbat,18500
-ORD-PK-9004,Saad VIP Order,+923455113612,House 22 Street 10 Sector F-7/2,Islamabad,2900`;
+ORD-PK-9004,Saad VIP Order,+923455113612,House 22 Street 10 Sector F-7/2,Islamabad,12000
+ORD-PK-9005,Usman Gujjar,+923001122334,D-Type Colony Samundri Road,Faisalabad,4200
+ORD-PK-9006,Bilal Tariq,+923334445566,Near Karkhano Market Hayatabad Phase 3,Peshawar,5900`;
     navigator.clipboard.writeText(csvContent);
-    setSavedMessage('Sample table copied to clipboard! Paste into Google Sheets.');
+    setSavedMessage('Copied 6-order Pakistani sample CSV to clipboard!');
     setTimeout(() => setSavedMessage(''), 3000);
   };
 
   return (
     <div className="min-h-screen bg-[#090d16] text-slate-100 flex flex-col">
-      {/* Header */}
+      {/* Top Navbar */}
       <header className="border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push('/dashboard')}
               className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-300"
+              title="Back to Dashboard"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
-            <h1 className="font-bold text-base text-white">Store Integrations Setup</h1>
+            <h1 className="font-extrabold text-base text-white tracking-tight">
+              Data &amp; Channel Integrations
+            </h1>
           </div>
           {savedMessage && (
-            <span className="text-xs text-emerald-400 font-semibold flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" /> {savedMessage}
+            <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 animate-in fade-in">
+              {savedMessage}
             </span>
           )}
         </div>
       </header>
 
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-8 space-y-6">
+      {/* Main Content */}
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-8 space-y-6">
         {/* 1. Evolution API WhatsApp Integration */}
         <div className="glass-panel p-6 rounded-2xl space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -136,7 +157,7 @@ ORD-PK-9004,Saad VIP Order,+923455113612,House 22 Street 10 Sector F-7/2,Islamab
               </span>
               <div>
                 <h3 className="font-bold text-sm text-white">WhatsApp Business (Evolution API)</h3>
-                <p className="text-xs text-slate-400">Runs autonomous confirmations & landmark proposals</p>
+                <p className="text-xs text-slate-400">Dedicated DeliverIQ Instance: <code className="text-emerald-400 font-mono">deliveriq_main</code></p>
               </div>
             </div>
 
@@ -145,7 +166,7 @@ ORD-PK-9004,Saad VIP Order,+923455113612,House 22 Street 10 Sector F-7/2,Islamab
                 waStatus?.connected ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
               }`}>
                 <span className={`w-2 h-2 rounded-full ${waStatus?.connected ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`}></span>
-                {waStatus?.connected ? `Connected (${waStatus.instance})` : 'Disconnected'}
+                {waStatus?.connected ? `Connected (${waStatus.instance})` : 'Awaiting Connection'}
               </span>
               <button
                 onClick={checkWhatsApp}
@@ -158,63 +179,36 @@ ORD-PK-9004,Saad VIP Order,+923455113612,House 22 Street 10 Sector F-7/2,Islamab
           </div>
 
           <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
-            {waInstances.length > 0 && (
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Active WhatsApp Instances Detected in Evolution API:
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <button
-                    onClick={() => setSelectedInstance('auto')}
-                    className={`p-2.5 rounded-xl border text-xs text-left transition-all ${
-                      selectedInstance === 'auto'
-                        ? 'border-indigo-500 bg-indigo-500/10 text-white font-bold'
-                        : 'border-slate-800 bg-slate-900 text-slate-400'
-                    }`}
-                  >
-                    <p className="font-semibold">⚡ Auto-Detect</p>
-                    <p className="text-[10px] text-slate-400">Picks open instance automatically</p>
-                  </button>
-                  {waInstances.map((inst, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setSelectedInstance(inst.name)}
-                      className={`p-2.5 rounded-xl border text-xs text-left transition-all ${
-                        selectedInstance === inst.name
-                          ? 'border-emerald-500 bg-emerald-500/10 text-white font-bold'
-                          : 'border-slate-800 bg-slate-900 text-slate-400'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono">{inst.name}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${
-                          inst.connectionStatus === 'open' ? 'bg-emerald-500/20 text-emerald-400 font-bold' : 'bg-slate-800 text-slate-400'
-                        }`}>
-                          {inst.connectionStatus}
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {waStatus?.connected ? (
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs font-semibold flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                WhatsApp is live and connected via instance <strong>{waStatus.instance}</strong>. The platform is ready to send confirmations!
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                <div className="text-emerald-300 text-xs font-semibold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                  <span>WhatsApp is connected via <strong className="font-mono">{waStatus.instance}</strong>. Orders for 03455113612 and 03410015303 will be sent live!</span>
+                </div>
+                <button
+                  onClick={handleDisconnect}
+                  className="px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-xs font-semibold border border-rose-500/30 transition-all flex-shrink-0"
+                >
+                  Disconnect &amp; Reset
+                </button>
               </div>
             ) : (
-              <div className="flex flex-col sm:flex-row items-center gap-4 pt-2">
-                <button
-                  onClick={fetchQr}
-                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-2"
-                >
-                  <QrCode className="w-4 h-4" /> Scan QR to Connect WhatsApp
-                </button>
+              <div className="flex flex-col sm:flex-row items-center gap-6 pt-2">
+                <div className="space-y-2">
+                  <button
+                    onClick={fetchQr}
+                    className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/20"
+                  >
+                    <QrCode className="w-4 h-4" /> {waQr ? 'Refresh QR Code' : 'Scan QR to Connect WhatsApp'}
+                  </button>
+                  <p className="text-[11px] text-slate-400 max-w-xs leading-relaxed">
+                    Open WhatsApp on your phone &gt; Settings &gt; Linked Devices &gt; Link a Device, then scan this QR code to connect.
+                  </p>
+                </div>
                 {waQr && (
-                  <div className="p-2 bg-white rounded-xl shadow-lg">
-                    <img src={waQr} alt="WhatsApp QR Code" className="w-44 h-44" />
+                  <div className="p-3 bg-white rounded-2xl shadow-2xl border-4 border-emerald-500/40 flex flex-col items-center">
+                    <img src={waQr} alt="WhatsApp QR Code" className="w-48 h-48" />
+                    <p className="text-center text-[10px] text-slate-800 font-bold mt-1.5">DeliverIQ Official Pair</p>
                   </div>
                 )}
               </div>

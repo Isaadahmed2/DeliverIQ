@@ -27,15 +27,16 @@ class EvolutionAPIClient:
             return []
 
     def get_first_connected_instance(self) -> Optional[str]:
-        """Auto-detects already open/connected WhatsApp instance."""
+        """Auto-detects open/connected WhatsApp instance specifically for DeliverIQ."""
         instances = self.list_instances()
         for inst in instances:
-            if inst.get("connectionStatus") == "open":
-                return inst.get("name")
+            name = inst.get("name", "")
+            if name.startswith("deliveriq_") and inst.get("connectionStatus") == "open":
+                return name
         return None
 
     def check_instance_status(self, instance_name: Optional[str] = None) -> Dict[str, Any]:
-        """Checks if instance is connected, with auto-fallback to any connected instance."""
+        """Checks if instance is connected, defaulting to deliveriq_main."""
         if not instance_name or instance_name == "auto":
             connected = self.get_first_connected_instance()
             if connected:
@@ -50,7 +51,6 @@ class EvolutionAPIClient:
                 state = data.get("instance", {}).get("state", "close")
                 return {"instance": instance_name, "state": state, "connected": state == "open"}
             
-            # If 404/not found, check if there is an active connected instance
             connected = self.get_first_connected_instance()
             if connected:
                 return {"instance": connected, "state": "open", "connected": True}
@@ -74,20 +74,17 @@ class EvolutionAPIClient:
             return {"error": str(e)}
 
     def get_qr_code(self, instance_name: str = "deliveriq_main") -> Dict[str, Any]:
-        """Fetches QR code, creating instance first if necessary."""
-        # Check if already connected to an active instance
-        active = self.get_first_connected_instance()
-        if active:
-            return {"instance": active, "connected": True, "message": f"Already connected via {active}"}
+        """Fetches fresh QR code for deliveriq_main instance."""
+        status = self.check_instance_status(instance_name)
+        if status.get("connected"):
+            return {"instance": instance_name, "connected": True, "message": f"Already connected via {instance_name}"}
 
-        # Try connecting/fetching QR
         url = f"{self.base_url}/instance/connect/{instance_name}"
         try:
             resp = requests.get(url, headers=self.headers, timeout=8)
             if resp.status_code in [200, 201]:
                 return resp.json()
             elif resp.status_code == 404:
-                # Create instance and retry
                 self.create_instance(instance_name)
                 resp2 = requests.get(url, headers=self.headers, timeout=8)
                 if resp2.status_code in [200, 201]:
@@ -95,6 +92,15 @@ class EvolutionAPIClient:
             return {"error": f"Failed to get QR: HTTP {resp.status_code}", "raw": resp.text}
         except Exception as e:
             return {"error": f"Evolution API connection failed: {str(e)}"}
+
+    def logout_instance(self, instance_name: str = "deliveriq_main") -> Dict[str, Any]:
+        """Logs out from an active WhatsApp instance."""
+        url = f"{self.base_url}/instance/logout/{instance_name}"
+        try:
+            resp = requests.delete(url, headers=self.headers, timeout=8)
+            return resp.json() if resp.status_code in [200, 201] else {"error": resp.text}
+        except Exception as e:
+            return {"error": str(e)}
 
     # User Safety Guardrail: ONLY these numbers may receive real outbound WhatsApp messages
     WHITELISTED_PHONES = {"923455113612", "923410015303"}
